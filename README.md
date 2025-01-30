@@ -3,14 +3,17 @@
 A command-line utility for adding frames, shadows, and backgrounds to images.
 
 ## Installation
+
 For this tool, you'll need:
     - Luajit
     - Luarocks
+    - Imagemagick
     - The libvips shared library
 
 If you're on mac, you can install all in one step:
+
 ```bash
-brew install vips luajit luarocks
+brew install vips luajit luarocks magick
 ```
 
 ## Usage

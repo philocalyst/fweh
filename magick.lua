@@ -1,0 +1,431 @@
+#!/usr/bin/env luajit
+
+local has_shadow = false
+
+local function embolden(text, color)
+	local colors = {
+		red = "31",
+		green = "32",
+		yellow = "33",
+		blue = "34",
+		magenta = "35",
+		cyan = "36",
+	}
+
+	local color_code = colors[color] or "31" -- default to red if color not specified
+	return string.format("\27[1;%sm%s\27[0m", color_code, text)
+end
+
+-- Super kind error handler
+local function handle_error(msg, level)
+	-- Default to level 2 (caller's line) if not specified
+	level = level or 2
+
+	-- Get debug information
+	local info = debug.getinfo(level, "Sl")
+	local line_info = ""
+
+	if info then
+		-- Format location info
+		line_info = string.format(" @%d▰▰▰ %s %s", info.currentline, embolden("IN", "red"), info.short_src)
+	end
+
+	io.stderr:write("▰▰▰" .. embolden("ERROR", "red") .. line_info .. ": " .. msg .. "\n")
+	os.exit(1)
+end
+
+local function get_script_dir()
+	local script_path = debug.getinfo(1, "S").source:sub(2)
+	local script_dir = script_path:match("(.*[/\\])") or "./"
+	return script_dir
+end
+
+-- Configure package path using table.concat for clarity
+package.path = table.concat({
+	package.path,
+	get_script_dir() .. "lua_modules/share/lua/5.1/?.lua",
+	get_script_dir() .. "lua_modules/share/lua/5.1/?/init.lua",
+}, ";")
+
+local ok, vips = pcall(require, "vips")
+if not ok then
+	handle_error("Failed to load vips library")
+end
+
+local function create_temp_file(identifier, extension)
+	local temp = os.tmpname()
+	os.remove(temp) -- Required as os.tmpname creates but doesn't open
+	return string.format("%s-%s.%s", temp, identifier, extension or "png")
+end
+
+local function add_drop_shadow(img, shadow_colour, shadow_offset, shadow_radius)
+	-- Default parameters
+	shadow_colour = shadow_colour
+	shadow_offset = shadow_offset
+	shadow_radius = shadow_radius
+
+	-- Add alpha channel if missing
+	if img:bands() < 4 then
+		img = img:addalpha()
+	end
+
+	-- Extract alpha channel to isolate that shape
+	local shadow_alpha = img:extract_band(img:bands() - 1)
+
+	-- Add padding and blur for the real shadow
+	local padded_alpha = shadow_alpha:embed(
+		shadow_offset.x,
+		-shadow_offset.y, --Negative for more predicatable y values
+		shadow_alpha:width() + 2 * shadow_radius,
+		shadow_alpha:height() + 2 * shadow_radius,
+		{ extend = vips.ExtendBackground }
+	)
+	local blurred_alpha = padded_alpha:gaussblur(shadow_radius / 2)
+
+	-- Create shadow template
+	local shadow_rgb = blurred_alpha:new_from_image(shadow_colour)
+	local shadow = shadow_rgb:bandjoin(blurred_alpha)
+
+	-- Calculate final composite positions for shadow offsets
+	local final_offset_x = math.max(0, shadow_offset.x - shadow_radius)
+	local final_offset_y = math.max(0, shadow_offset.y - shadow_radius)
+
+	-- Composite layers (background first, then shadow, then image)
+	local result = shadow:composite(img, "over", { x = final_offset_x }, { y = final_offset_y })
+
+	return result
+end
+
+local function round_corners(img, radius_percentage)
+	-- Convert percentage-based radius to absolute pixels
+	local radius = math.max(img:width(), img:height()) * (radius_percentage / 100)
+
+	-- Early exit if no rounding is needed
+	if radius <= 0 then
+		return img
+	end
+
+	-- Create a white rectangle with rounded corners (SVG equivalent)
+	local rect = vips.Image.new_from_buffer(
+		string.format(
+			[[
+      <svg viewBox="0 0 %d %d">
+        <rect rx="%d" ry="%d"
+              x="0" y="0" width="%d" height="%d"
+              fill="#fff"/>
+      </svg>]],
+			img:width(),
+			img:height(),
+			radius,
+			radius,
+			img:width(),
+			img:height()
+		),
+		""
+	)
+
+	-- Bandjoin the image with the rectangle to create a mask
+	img = rect:composite2(img, "in", { x = x, y = y })
+
+	-- Save the resulting image back to the file
+	return img
+end
+
+local function resize_with_padding(width, height, target_ratio, scale)
+	local original_ratio = width / height
+	local new_width, new_height
+
+	if target_ratio > original_ratio then
+		new_height = math.floor(height * scale / 100)
+		new_width = math.floor(new_height * target_ratio)
+	else
+		new_width = math.floor(width * scale / 100)
+		new_height = math.floor(new_width / target_ratio)
+	end
+
+	local pad_width = math.max(0, new_width - math.floor(width * scale / 100))
+	local pad_height = math.max(0, new_height - math.floor(height * scale / 100))
+
+	return new_width,
+		new_height,
+		math.floor(pad_width / 2),
+		pad_width - math.floor(pad_width / 2),
+		math.floor(pad_height / 2),
+		pad_height - math.floor(pad_height / 2)
+end
+
+local function calculate_aspect_ratio(width, height)
+	local function gcd(a, b)
+		return b == 0 and a or gcd(b, a % b)
+	end
+	local divisor = gcd(width, height)
+	return (width / divisor) / (height / divisor)
+end
+
+local function execute_command(cmd)
+	local success, _, _ = os.execute(cmd) -- Success only because error code is inconsistent with magick
+	if not success then
+		handle_error("Command failed: " .. cmd)
+	end
+end
+
+local function create_background(width, height, ratio, scale, background)
+	local bg_type, bg_value = background.type, background.value
+	local bg_file = create_temp_file("background")
+
+	--Calculate appropriate dimensions
+	local new_width, new_height = resize_with_padding(width, height, ratio, scale)
+
+	if bg_type == "pre" or bg_type == "grad" then
+		execute_command(string.format("magick -size %dx%d gradient:%s %s", new_width, new_height, bg_value, bg_file))
+	elseif bg_type == "colr" then
+		execute_command(string.format("magick -size %dx%d xc:%s %s", new_width, new_height, bg_value, bg_file))
+	elseif bg_type == "imag" then
+		local ok, bg_image = pcall(vips.Image.new_from_file, bg_value)
+		if not ok then
+			handle_error("Failed to load background image: " .. bg_value)
+		end
+
+		-- Resize and write to temp file
+		local resized = bg_image:resize(new_width / bg_image:width(), {})
+
+		if not pcall(resized.write_to_file, resized, bg_file) then
+			handle_error("Failed to write resized background image")
+		end
+	end
+
+	return bg_file
+end
+
+local function show_help()
+	print([[
+Usage: frame [OPTIONS] <input_image>
+
+Options:
+  -h, --help                     Show this help
+  -o, --output FILE              Output filename (default: output.png)
+  -s, --scale PERCENT            Scale percentage (default: 110)
+  -b, --background TYPE:VALUE    Background type and value (e.g. color:black)
+  --roundness RADIUS             Border radius (default: 0)
+  -r, --ratio W:H               Target aspect ratio (e.g. 16:9)
+
+Shadow Options:
+  --shadow-offset X,Y            Shadow offset in pixels (default: 25,25)
+  --shadow-color COLOR           Shadow color (default: black)
+  --shadow-radius RADIUS         Shadow blur radius (default: 25)
+  --shadow-opacity VALUE         Shadow opacity (0-1, default: 1)
+]])
+	os.exit(0)
+end
+
+local function parse_args()
+	local args = {
+		output = "output.png",
+		scale = 110,
+		radius = 0,
+		offset = { x = 0, y = 0 },
+		shadow_offset = { x = 25, y = -25 },
+		shadow_color = { 0, 0, 0 },
+		shadow_opacity = 1,
+		shadow_radius = 25,
+		background = { type = "colr", value = "black" },
+	}
+
+	if #arg < 1 then
+		show_help() -- If no args given, show help
+	end
+
+	local i = 1
+	while i <= #arg do
+		local a = arg[i]
+		if a == "-h" or a == "--help" then
+			show_help()
+		elseif a == "-o" or a == "--output" then
+			if not arg[i + 1] then
+				handle_error("Missing output filename")
+			end
+			args.output = arg[i + 1]
+			i = i + 2
+		elseif a == "-s" or a == "--scale" then
+			if not arg[i + 1] then
+				handle_error("Missing scale value")
+			end
+			args.scale = tonumber(arg[i + 1])
+			if not args.scale then
+				handle_error("Invalid scale value: " .. arg[i + 1])
+			end
+			i = i + 2
+		elseif a == "-b" or a == "--background" then
+			if not arg[i + 1] then
+				handle_error("Missing background specification")
+			end
+			local type, value = arg[i + 1]:match("([^:]+):([^:]+)")
+			if not type or not value then
+				handle_error("Invalid background format. Expected TYPE:VALUE")
+			end
+			args.background.type = type
+			args.background.value = value
+			i = i + 2
+		elseif a == "--roundness" then
+			if not arg[i + 1] then
+				handle_error("Missing roundness value")
+			end
+			args.radius = tonumber(arg[i + 1])
+			if not args.radius then
+				handle_error("Invalid roundness value: " .. arg[i + 1])
+			end
+			i = i + 2
+		elseif a == "--shadow-offset" then
+			has_shadow = true
+			if not arg[i + 1] then
+				handle_error("Missing shadow offset values")
+			end
+			local x, y = arg[i + 1]:match("([^,]+),([^,]+)")
+			if not y then
+				-- Single value provided, use for both x and y
+				x = tonumber(arg[i + 1])
+				if not x then
+					handle_error("Invalid shadow offset value: " .. arg[i + 1])
+				end
+				args.shadow_offset.x = x
+				args.shadow_offset.y = x
+			else
+				-- Separate x,y values provided
+				x = tonumber(x)
+				y = tonumber(y)
+				if not x or not y then
+					handle_error("Invalid shadow offset values: " .. arg[i + 1])
+				end
+				args.shadow_offset.x = x
+				args.shadow_offset.y = y
+			end
+			i = i + 2
+		elseif a == "--offset" then
+			if not arg[i + 1] then
+				handle_error("Missing offset values, expected X,Y")
+			end
+			local x, y = arg[i + 1]:match("([^,]+),([^,]+)")
+			if not x then
+				-- Single value provided, use for both x and y
+				x = tonumber(arg[i + 1])
+				if not x then
+					handle_error("Invalid shadow offset value: " .. arg[i + 1])
+				end
+				args.offset.x = x
+				args.offset.y = x
+			else
+				-- Separate x,y values provided
+				x = tonumber(x)
+				y = tonumber(y)
+				if not x or not y then
+					handle_error("Invalid shadow offset values: " .. arg[i + 1])
+				end
+				args.offset.x = x
+				args.offset.y = y
+			end
+			i = i + 2
+		elseif a == "--shadow-color" then
+			has_shadow = true
+			if not arg[i + 1] then
+				handle_error("Missing shadow color value")
+			end
+			args.shadow_color = arg[i + 1]
+			i = i + 2
+		elseif a == "--shadow-radius" then
+			has_shadow = true
+			if not arg[i + 1] then
+				handle_error("Missing shadow radius value")
+			end
+			args.shadow_radius = tonumber(arg[i + 1])
+			if not args.shadow_radius then
+				handle_error("Invalid shadow radius value: " .. arg[i + 1])
+			end
+			i = i + 2
+		elseif a == "-r" or a == "--ratio" then
+			if not arg[i + 1] then
+				handle_error("Missing aspect ratio value")
+			end
+			local w, h = arg[i + 1]:match("(%d+):(%d+)")
+			if not w or not h then
+				handle_error("Invalid ratio format. Expected W:H (e.g. 16:9)")
+			end
+			args.ratio = tonumber(w) / tonumber(h)
+			i = i + 2
+		else
+			if args.input then
+				handle_error("Multiple input files specified")
+			end
+			args.input = a
+			i = i + 1
+		end
+	end
+
+	-- Explicit support for pipes
+	if not args.input then
+		for line in io.lines() do
+			args.input = line:match("%S+")
+			if args.input then
+				break
+			end
+		end
+	end
+
+	if not args.input then
+		handle_error("No input image specified")
+	end
+
+	if args.input == args.output then
+		handle_error("Input and output cannot be the same path")
+	end
+
+	return args
+end
+
+local function main()
+	local args = parse_args()
+
+	-- Load and validate input image
+	local ok, overlay = pcall(vips.Image.new_from_file, args.input)
+	if not ok then
+		handle_error("Failed to load input image: " .. args.input)
+	end
+
+	local preprocess_width = overlay:width()
+	local preprocess_height = overlay:height()
+	-- Process image
+	local target_ratio = args.ratio or calculate_aspect_ratio(overlay:width(), overlay:height())
+	local bg_image = create_background(overlay:width(), overlay:height(), target_ratio, args.scale, args.background)
+
+	local ok, result = pcall(function()
+		local processed = round_corners(overlay, args.radius)
+		if has_shadow then
+			processed = add_drop_shadow(processed, args.shadow_color, args.shadow_offset, args.shadow_radius)
+		end
+
+		local background = vips.Image.new_from_file(bg_image)
+		background = background:colourspace("srgb")
+
+		if background:bands() ~= processed:bands() then
+			background = background:bands() == 3 and background:bandjoin(255) or background:flatten()
+		end
+
+		local x = math.max(0, math.floor((background:width() - preprocess_width) / 2)) + args.offset.x
+		local y = math.max(0, math.floor((background:height() - preprocess_height) / 2)) + args.offset.y
+
+		return background:composite2(processed, "over", { x = x, y = y })
+	end)
+
+	if not ok then
+		handle_error(result)
+	end
+
+	-- Write output
+	if not pcall(result.write_to_file, result, args.output) then
+		handle_error("Failed to write output file: " .. args.output)
+	end
+
+	print(args.output)
+	os.remove(bg_image)
+end
+
+main()

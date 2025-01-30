@@ -205,7 +205,7 @@ Options:
   -h, --help                     Show this help
   -o, --output FILE              Output filename (default: output.png)
   -s, --scale PERCENT            Scale percentage (default: 110)
-  -b, --background TYPE:VALUE    Background type and value (e.g. color:black)
+  -b, --background TYPE:VALUE    Background type and value (e.g. colr:black)
   -r, --ratio W:H               Target aspect ratio (e.g. 16:9)
 	--roundness RADIUS             Border radius (default: 0)
 	--offset X,Y            			 Offset in pixels (default: 0,0)

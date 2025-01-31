@@ -58,18 +58,13 @@ local function create_temp_file(identifier, extension)
 	return string.format("%s-%s.%s", temp, identifier, extension or "png")
 end
 
-local function add_drop_shadow(img, shadow_colour, shadow_offset, shadow_radius)
-	-- Default parameters
-	shadow_colour = shadow_colour
-	shadow_offset = shadow_offset
-	shadow_radius = shadow_radius
-
+local function add_drop_shadow(img, shadow_colour, shadow_offset, shadow_radius, shadow_opacity)
 	-- Add alpha channel if missing
 	if img:bands() < 4 then
 		img = img:addalpha()
 	end
 
-	-- Extract alpha channel to isolate that shape
+	-- Extract alpha channel to isolate those curves
 	local shadow_alpha = img:extract_band(img:bands() - 1)
 
 	-- Add padding and blur for the real shadow
@@ -80,7 +75,7 @@ local function add_drop_shadow(img, shadow_colour, shadow_offset, shadow_radius)
 		shadow_alpha:height() + 2 * shadow_radius,
 		{ extend = vips.ExtendBackground }
 	)
-	local blurred_alpha = padded_alpha:gaussblur(shadow_radius / 2)
+	local blurred_alpha = padded_alpha:gaussblur(shadow_radius / 2) * shadow_opacity
 
 	-- Create shadow template
 	local shadow_rgb = blurred_alpha:new_from_image(shadow_colour)
@@ -97,13 +92,8 @@ local function add_drop_shadow(img, shadow_colour, shadow_offset, shadow_radius)
 end
 
 local function round_corners(img, radius_percentage)
-	-- Convert percentage-based radius to absolute pixels
+	-- Convert relative radius to cold pixels
 	local radius = math.max(img:width(), img:height()) * (radius_percentage / 100)
-
-	-- Early exit if no rounding is needed
-	if radius <= 0 then
-		return img
-	end
 
 	-- Create a white rectangle with rounded corners (SVG equivalent)
 	local rect = vips.Image.new_from_buffer(
@@ -197,7 +187,7 @@ local function create_background(width, height, ratio, scale, background)
 	return bg_file
 end
 
-local function show_help()
+local function show_help(err)
 	print([[
 Usage: frame [OPTIONS] <input_image>
 
@@ -216,7 +206,12 @@ Shadow Options: (Only applied when at least one shadow opt is passed)
   --shadow-radius RADIUS         Shadow blur radius (default: 25)
   --shadow-opacity VALUE         Shadow opacity (0-1, default: 1)
 ]])
-	os.exit(0)
+
+	if err then
+		handle_error(err)
+	else
+		os.exit(0)
+	end
 end
 
 local function parse_args()
@@ -231,10 +226,6 @@ local function parse_args()
 		shadow_radius = 25,
 		background = { type = "colr", value = "black" },
 	}
-
-	if #arg < 1 then
-		show_help() -- If no args given, show help
-	end
 
 	local i = 1
 	while i <= #arg do
@@ -342,6 +333,16 @@ local function parse_args()
 				handle_error("Invalid shadow radius value: " .. arg[i + 1])
 			end
 			i = i + 2
+		elseif a == "--shadow-opacity" then
+			has_shadow = true
+			if not arg[i + 1] then
+				handle_error("Missing shadow opacity value")
+			end
+			args.shadow_opacity = tonumber(arg[i + 1])
+			if not args.shadow_radius then
+				handle_error("Invalid shadow opacity value: " .. arg[i + 1])
+			end
+			i = i + 2
 		elseif a == "-r" or a == "--ratio" then
 			if not arg[i + 1] then
 				handle_error("Missing aspect ratio value")
@@ -363,16 +364,22 @@ local function parse_args()
 
 	-- Explicit support for pipes
 	if not args.input then
-		for line in io.lines() do
-			args.input = line:match("%S+")
-			if args.input then
+		while true do
+			local line = io.stdin:read("*l")
+			if not line then
+				break
+			end
+
+			local match = line:match("%S+")
+			if match then
+				args.input = match
 				break
 			end
 		end
 	end
 
 	if not args.input then
-		handle_error("No input image specified")
+		show_help("No input image specified") -- No arguments given, show help.
 	end
 
 	if args.input == args.output then
@@ -393,14 +400,27 @@ local function main()
 
 	local preprocess_width = overlay:width()
 	local preprocess_height = overlay:height()
+
 	-- Process image
 	local target_ratio = args.ratio or calculate_aspect_ratio(overlay:width(), overlay:height())
 	local bg_image = create_background(overlay:width(), overlay:height(), target_ratio, args.scale, args.background)
 
 	local ok, result = pcall(function()
-		local processed = round_corners(overlay, args.radius)
+		local processed = overlay
+		-- Early exit if no rounding is needed
+		if args.radius > 0 then
+			processed = round_corners(overlay, args.radius)
+		end
+
+		--No shadow, no shadow
 		if has_shadow then
-			processed = add_drop_shadow(processed, args.shadow_color, args.shadow_offset, args.shadow_radius)
+			processed = add_drop_shadow(
+				processed,
+				args.shadow_color,
+				args.shadow_offset,
+				args.shadow_radius,
+				args.shadow_opacity
+			)
 		end
 
 		local background = vips.Image.new_from_file(bg_image)
@@ -420,11 +440,12 @@ local function main()
 		handle_error(result)
 	end
 
-	-- Write output
+	-- Write to file
 	if not pcall(result.write_to_file, result, args.output) then
 		handle_error("Failed to write output file: " .. args.output)
 	end
 
+	-- Display output path
 	print(args.output)
 	os.remove(bg_image)
 end

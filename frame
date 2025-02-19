@@ -163,13 +163,18 @@ local function create_background(width, height, ratio, scale, background)
 	local bg_type, bg_value = background.type, background.value
 	local bg_file = create_temp_file("background")
 
-	--Calculate appropriate dimensions
+	-- Calculate appropriate dimensions
 	local new_width, new_height = resize_with_padding(width, height, ratio, scale)
 
 	if bg_type == "pre" or bg_type == "grad" then
 		execute_command(string.format("magick -size %dx%d gradient:%s %s", new_width, new_height, bg_value, bg_file))
 	elseif bg_type == "colr" then
-		execute_command(string.format("magick -size %dx%d xc:%s %s", new_width, new_height, bg_value, bg_file))
+	local pixel = vips.Image.black(1, 1)
+	pixel = pixel:add({0, 0, 255})
+	local resized_pixel = pixel:embed(0, 0, new_width, new_height, {
+        extend = "copy"
+    })
+    resized_pixel:write_to_file(bg_file)
 	elseif bg_type == "imag" then
 		local ok, bg_image = pcall(vips.Image.new_from_file, bg_value)
 		if not ok then

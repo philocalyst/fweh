@@ -12,7 +12,7 @@ local function embolden(text, color)
 		cyan = "36",
 	}
 
-	local color_code = colors[color] or "31" -- default to red if color not specified
+	local color_code = colors[color] or "31"   -- default to red if color not specified
 	return string.format("\27[1;%sm%s\27[0m", color_code, text)
 end
 
@@ -54,7 +54,7 @@ end
 
 local function create_temp_file(identifier, extension)
 	local temp = os.tmpname()
-	os.remove(temp) -- Required as os.tmpname creates but doesn't open
+	os.remove(temp)   -- Required as os.tmpname creates but doesn't open
 	return string.format("%s-%s.%s", temp, identifier, extension or "png")
 end
 
@@ -70,7 +70,7 @@ local function add_drop_shadow(img, shadow_colour, shadow_offset, shadow_radius,
 	-- Add padding and blur for the real shadow
 	local padded_alpha = shadow_alpha:embed(
 		shadow_offset.x,
-		-shadow_offset.y, --Negative for more predicatable y values
+		-shadow_offset.y,     -- Negative for more predicatable y values
 		shadow_alpha:width() + 2 * shadow_radius,
 		shadow_alpha:height() + 2 * shadow_radius,
 		{ extend = vips.ExtendBackground }
@@ -99,11 +99,11 @@ local function round_corners(img, radius_percentage)
 	local rect = vips.Image.new_from_buffer(
 		string.format(
 			[[
-      <svg viewBox="0 0 %d %d">
-        <rect rx="%d" ry="%d"
-              x="0" y="0" width="%d" height="%d"
-              fill="#fff"/>
-      </svg>]],
+            <svg viewBox="0 0 %d %d">
+                <rect rx="%d" ry="%d"
+                      x="0" y="0" width="%d" height="%d"
+                      fill="#fff"/>
+            </svg>]],
 			img:width(),
 			img:height(),
 			radius,
@@ -137,11 +137,11 @@ local function resize_with_padding(width, height, target_ratio, scale)
 	local pad_height = math.max(0, new_height - math.floor(height * scale / 100))
 
 	return new_width,
-		new_height,
-		math.floor(pad_width / 2),
-		pad_width - math.floor(pad_width / 2),
-		math.floor(pad_height / 2),
-		pad_height - math.floor(pad_height / 2)
+			new_height,
+			math.floor(pad_width / 2),
+			pad_width - math.floor(pad_width / 2),
+			math.floor(pad_height / 2),
+			pad_height - math.floor(pad_height / 2)
 end
 
 local function calculate_aspect_ratio(width, height)
@@ -153,7 +153,7 @@ local function calculate_aspect_ratio(width, height)
 end
 
 local function execute_command(cmd)
-	local success, _, _ = os.execute(cmd) -- Success only because error code is inconsistent with magick
+	local success, _, _ = os.execute(cmd)   -- Success only because error code is inconsistent with magick
 	if not success then
 		handle_error("Command failed: " .. cmd)
 	end
@@ -371,24 +371,8 @@ local function parse_args()
 		end
 	end
 
-	-- Explicit support for pipes
 	if not args.input then
-		while true do
-			local line = io.stdin:read("*l")
-			if not line then
-				break
-			end
-
-			local match = line:match("%S+")
-			if match then
-				args.input = match
-				break
-			end
-		end
-	end
-
-	if not args.input then
-		show_help("No input image specified") -- No arguments given, show help.
+		show_help("No input image specified")     -- No arguments given, show help.
 	end
 
 	if args.input == args.output then
@@ -416,6 +400,7 @@ local function main()
 
 	local ok, result = pcall(function()
 		local processed = overlay
+
 		-- Early exit if no rounding is needed
 		if args.radius > 0 then
 			processed = round_corners(overlay, args.radius)
@@ -440,6 +425,7 @@ local function main()
 		end
 
 		local x = math.max(0, math.floor((background:width() - preprocess_width) / 2)) + args.offset.x
+
 		local y = math.max(0, math.floor((background:height() - preprocess_height) / 2)) + args.offset.y
 
 		return background:composite2(processed, "over", { x = x, y = y })
@@ -456,7 +442,9 @@ local function main()
 
 	-- Display output path
 	print(args.output)
+
 	os.remove(bg_image)
 end
+
 
 main()

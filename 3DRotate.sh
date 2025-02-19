@@ -363,8 +363,8 @@ function testFloat
 # get input image size
 function imagesize
 	{
-	width=`magick $tmpA -format %w info:`
-	height=`magick $tmpA -format %h info:`
+	width=`vipsheader -f width $tmpA`
+	height=`vipsheader -f height $tmpA`
 	}
 
 # test for correct number of arguments and get values

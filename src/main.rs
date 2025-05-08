@@ -11,12 +11,9 @@ mod shadow;
 mod utils;
 
 use anyhow::Result;
+use args::parse_args;
+use image_processing::process_image;
 use log::{error, info};
-use std::path::Path;
-
-use args::{parse_args, Args};
-use error::FramerError;
-use image_processing::{process_image, ProcessingOptions};
 
 fn main() -> Result<()> {
     // Initialize logger

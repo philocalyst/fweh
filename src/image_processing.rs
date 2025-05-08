@@ -1,8 +1,8 @@
 //! Core image processing functions
 
-use anyhow::{anyhow, Result};
-use image::{imageops, DynamicImage, GenericImageView, ImageBuffer, Rgba, RgbaImage};
-use log::{debug, info};
+use anyhow::Result;
+use image::{imageops, RgbaImage};
+use log::debug;
 use std::path::{Path, PathBuf};
 
 use crate::background::{create_background, BackgroundType};

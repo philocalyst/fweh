@@ -1,12 +1,10 @@
 //! Command line argument parsing
 
 use anyhow::{anyhow, Result};
-use clap::{ArgAction, Parser};
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+use clap::Parser;
+use std::path::PathBuf;
 
 use crate::background::BackgroundType;
-use crate::error::FramerError;
 use crate::image_processing::{AspectRatio, ProcessingOptions};
 use crate::shadow::ShadowOptions;
 use crate::utils::Point;

@@ -1,7 +1,7 @@
 //! Shadow effects
 
-use anyhow::{anyhow, Result};
-use image::{imageops::blur, DynamicImage, GenericImageView, ImageBuffer, Rgba, RgbaImage};
+use anyhow::Result;
+use image::{imageops, ImageBuffer, Rgba, RgbaImage};
 use log::debug;
 
 use crate::background::parse_color;

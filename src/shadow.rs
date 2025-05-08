@@ -109,29 +109,12 @@ pub fn add_drop_shadow(image: &RgbaImage, options: &ShadowOptions) -> Result<Rgb
     let image_pos_y = shadow_pos_y + offset_y;
 
     // Draw the original image on top of the shadow
-    for (x, y, pixel) in image.enumerate_pixels() {
-        let final_x = image_pos_x + x;
-        let final_y = image_pos_y + y;
-
-        if final_x < final_width && final_y < final_height && pixel[3] > 0 {
-            // Composite the original pixel over the shadow
-            let existing = final_image.get_pixel(final_x, final_y);
-            let alpha = pixel[3] as f32 / 255.0;
-            let result = Rgba([
-                blend(existing[0], pixel[0], alpha),
-                blend(existing[1], pixel[1], alpha),
-                blend(existing[2], pixel[2], alpha),
-                blend(existing[3], pixel[3], alpha),
-            ]);
-
-            final_image.put_pixel(final_x, final_y, result);
-        }
-    }
+    imageops::overlay(
+        &mut final_image,
+        image.into(),
+        image_pos_x.into(),
+        image_pos_y.into(),
+    );
 
     Ok(final_image)
-}
-
-/// Blend two color values based on alpha
-fn blend(bg: u8, fg: u8, alpha: f32) -> u8 {
-    (bg as f32 * (1.0 - alpha) + fg as f32 * alpha) as u8
 }

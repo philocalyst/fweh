@@ -2,7 +2,7 @@
 
 use anyhow::{anyhow, Result};
 use fast_image_resize as fir;
-use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba, RgbaImage};
+use image::{imageops, DynamicImage, GenericImageView, ImageBuffer, Rgba, RgbaImage};
 use log::{debug, info};
 use std::path::{Path, PathBuf};
 
@@ -101,70 +101,18 @@ pub fn process_image(
     debug!("Placing image at position ({}, {})", x, y);
 
     // Composite the processed image onto the background
-    let final_image = if options.shadow.is_some() {
-        composite_images(&background, &with_shadow, x as i32, y as i32)?
+    if options.shadow.is_some() {
+        imageops::overlay(&mut background, &with_shadow, x as i64, y as i64)
     } else {
-        composite_images(&background, &processed, x as i32, y as i32)?
+        imageops::overlay(&mut background, &processed, x as i64, y as i64);
     };
 
     // Save the final image
-    final_image
+    background
         .save(output_path)
         .map_err(|e| FramerError::ImageSaveError(e.to_string()))?;
 
     Ok(output_path.to_path_buf())
-}
-
-/// Composite one image onto another at the specified position
-fn composite_images(
-    background: &RgbaImage,
-    foreground: &RgbaImage,
-    x_offset: i32,
-    y_offset: i32,
-) -> Result<RgbaImage> {
-    let (bg_width, bg_height) = background.dimensions();
-    let (fg_width, fg_height) = foreground.dimensions();
-
-    let mut result = background.clone();
-
-    for y in 0..fg_height {
-        let bg_y = y_offset + y as i32;
-        if bg_y < 0 || bg_y >= bg_height as i32 {
-            continue;
-        }
-
-        for x in 0..fg_width {
-            let bg_x = x_offset + x as i32;
-            if bg_x < 0 || bg_x >= bg_width as i32 {
-                continue;
-            }
-
-            let fg_pixel = foreground.get_pixel(x, y);
-            if fg_pixel[3] == 0 {
-                continue; // Skip fully transparent pixels
-            }
-
-            let bg_pixel = result.get_pixel(bg_x as u32, bg_y as u32);
-
-            // Alpha compositing
-            let alpha = fg_pixel[3] as f32 / 255.0;
-            let result_pixel = Rgba([
-                blend(bg_pixel[0], fg_pixel[0], alpha),
-                blend(bg_pixel[1], fg_pixel[1], alpha),
-                blend(bg_pixel[2], fg_pixel[2], alpha),
-                blend(bg_pixel[3], fg_pixel[3], alpha),
-            ]);
-
-            result.put_pixel(bg_x as u32, bg_y as u32, result_pixel);
-        }
-    }
-
-    Ok(result)
-}
-
-/// Blend two color values based on alpha
-fn blend(bg: u8, fg: u8, alpha: f32) -> u8 {
-    (bg as f32 * (1.0 - alpha) + fg as f32 * alpha) as u8
 }
 
 /// Round the corners of an image

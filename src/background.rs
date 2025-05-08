@@ -1,12 +1,8 @@
 //! Background generation
 
 use anyhow::{anyhow, Result};
-use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba, RgbaImage};
+use image::{Rgba, RgbaImage};
 use log::debug;
-use std::path::Path;
-
-use crate::error::FramerError;
-use crate::utils::{create_temp_file, Point};
 
 /// Types of backgrounds supported by the image framer
 #[derive(Debug, Clone)]
@@ -23,8 +19,6 @@ pub enum BackgroundType {
 
 /// Create a background image with the given parameters
 pub fn create_background(
-    width: u32,
-    height: u32,
     new_width: u32,
     new_height: u32,
     background: &BackgroundType,
@@ -51,7 +45,7 @@ fn create_color_background(width: u32, height: u32, color: &str) -> Result<RgbaI
     let rgba = parse_color(color)?;
 
     // Create a new image with the specified color
-    let mut img = RgbaImage::new(width, height);
+    let mut img = RgbaImage::from_pixel(width, height, rgba);
     for pixel in img.pixels_mut() {
         *pixel = rgba;
     }
@@ -94,9 +88,7 @@ fn create_image_background(width: u32, height: u32, path: &str) -> Result<RgbaIm
     debug!("Creating image background from: {}", path);
 
     // Load the background image
-    let bg_image = image::open(path).map_err(|e| {
-        FramerError::BackgroundError(format!("Failed to load background image: {}", e))
-    })?;
+    let bg_image = image::open(path)?;
 
     // Resize the image to fit the new dimensions
     let resized = bg_image.resize_to_fill(width, height, image::imageops::FilterType::Lanczos3);

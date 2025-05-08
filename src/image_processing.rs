@@ -1,7 +1,6 @@
 //! Core image processing functions
 
 use anyhow::{anyhow, Result};
-use fast_image_resize as fir;
 use image::{imageops, DynamicImage, GenericImageView, ImageBuffer, Rgba, RgbaImage};
 use log::{debug, info};
 use std::path::{Path, PathBuf};
@@ -91,8 +90,7 @@ pub fn process_image(
     debug!("Creating background of size {}x{}", new_width, new_height);
 
     // Create background
-    let mut background =
-        create_background(width, height, new_width, new_height, &options.background)?;
+    let mut background = create_background(width, height, &options.background)?;
 
     // Calculate position to place the image on the background
     let x = (new_width as f32 - width as f32) / 2.0 + options.offset.x;

@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use image::{imageops, ImageBuffer, Rgba, RgbaImage};
-use log::debug;
+use log;
 use rgb;
 
 use crate::background::parse_color;
@@ -27,9 +27,11 @@ pub struct ShadowOptions {
 
 /// Add a drop shadow to an image
 pub fn add_drop_shadow(image: &RgbaImage, options: &ShadowOptions) -> Result<RgbaImage> {
-    debug!(
+    log::debug!(
         "Adding drop shadow with radius {} and offset ({}, {})",
-        options.radius, options.offset.x, options.offset.y
+        options.radius,
+        options.offset.x,
+        options.offset.y
     );
 
     // Parse shadow color
@@ -65,11 +67,14 @@ pub fn add_drop_shadow(image: &RgbaImage, options: &ShadowOptions) -> Result<Rgb
             );
         }
     }
+    log::trace!("Began copying alpha channel to create the shadow mask");
 
     // Apply Gaussian blur to create the shadow effect
+    log::trace!("Applying Guassian blur");
     image::imageops::blur(&alpha_mask, options.radius);
 
     // Apply opacity to the blurred mask
+    log::trace!("Applying opacity to the blurred mask");
     let mut shadow_image = RgbaImage::new(shadow_width, shadow_height);
     for (x, y, pixel) in alpha_mask.enumerate_pixels() {
         let alpha = (pixel[3] as f32 * options.opacity).min(255.0) as u8;
@@ -100,6 +105,7 @@ pub fn add_drop_shadow(image: &RgbaImage, options: &ShadowOptions) -> Result<Rgb
     };
 
     // Draw the shadow
+    log::trace!("Drawing the image shadow");
     for (x, y, pixel) in shadow_image.enumerate_pixels() {
         let final_x = shadow_pos_x + x + options.offset.x.max(0.0) as u32;
         let final_y = shadow_pos_y + y + options.offset.y.max(0.0) as u32;

@@ -3,9 +3,10 @@
 use anyhow::Result;
 use image::{imageops, ImageBuffer, Rgba, RgbaImage};
 use log::debug;
+use rgb;
 
 use crate::background::parse_color;
-use crate::error::FramerError;
+use crate::image_processing::to_image_rgba;
 use crate::utils::Point;
 
 /// Shadow options for the image framer
@@ -32,8 +33,7 @@ pub fn add_drop_shadow(image: &RgbaImage, options: &ShadowOptions) -> Result<Rgb
     );
 
     // Parse shadow color
-    let shadow_color = parse_color(&options.color)
-        .map_err(|e| FramerError::ShadowError(format!("Invalid shadow color: {}", e)))?;
+    let shadow_color = parse_color(&options.color)?;
 
     // Calculate dimensions for the shadow image
     let shadow_width = image.width() + 2 * options.radius as u32;
@@ -56,7 +56,12 @@ pub fn add_drop_shadow(image: &RgbaImage, options: &ShadowOptions) -> Result<Rgb
             alpha_mask.put_pixel(
                 shadow_x,
                 shadow_y,
-                Rgba([255, 255, 255, (alpha * 255.0) as u8]),
+                to_image_rgba(rgb::Rgba {
+                    r: 255,
+                    g: 255,
+                    b: 255,
+                    a: (alpha * 255.0) as u8,
+                }),
             );
         }
     }
@@ -71,7 +76,7 @@ pub fn add_drop_shadow(image: &RgbaImage, options: &ShadowOptions) -> Result<Rgb
         shadow_image.put_pixel(
             x,
             y,
-            Rgba([shadow_color[0], shadow_color[1], shadow_color[2], alpha]),
+            Rgba([shadow_color.r, shadow_color.g, shadow_color.b, alpha]),
         );
     }
 

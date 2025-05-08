@@ -1,8 +1,11 @@
 //! Background generation
 
 use anyhow::{anyhow, Result};
-use image::{Rgba, RgbaImage};
+use image::RgbaImage;
 use log::debug;
+use rgb::{Rgba, RGBA8};
+
+use crate::image_processing::to_image_rgba;
 
 /// Types of backgrounds supported by the image framer
 #[derive(Debug, Clone)]
@@ -45,9 +48,9 @@ fn create_color_background(width: u32, height: u32, color: &str) -> Result<RgbaI
     let rgba = parse_color(color)?;
 
     // Create a new image with the specified color
-    let mut img = RgbaImage::from_pixel(width, height, rgba);
+    let mut img = RgbaImage::from_pixel(width, height, to_image_rgba(rgba));
     for pixel in img.pixels_mut() {
-        *pixel = rgba;
+        *pixel = to_image_rgba(rgba);
     }
 
     Ok(img)
@@ -76,7 +79,7 @@ fn create_gradient_background(width: u32, height: u32, gradient: &str) -> Result
         let color = interpolate_color(colors[index], colors[next_index], local_progress);
 
         for x in 0..width {
-            img.put_pixel(x, y, color);
+            img.put_pixel(x, y, to_image_rgba(color));
         }
     }
 
@@ -100,7 +103,7 @@ fn create_image_background(width: u32, height: u32, path: &str) -> Result<RgbaIm
 }
 
 /// Parse a color string to an RGBA value
-pub fn parse_color(color: &str) -> Result<Rgba<u8>> {
+pub fn parse_color(color: &str) -> Result<RGBA8> {
     // Handle hex colors
     if color.starts_with('#') {
         let hex = color.trim_start_matches('#');
@@ -111,7 +114,12 @@ pub fn parse_color(color: &str) -> Result<Rgba<u8>> {
                 let r = u8::from_str_radix(&hex[0..2], 16)?;
                 let g = u8::from_str_radix(&hex[2..4], 16)?;
                 let b = u8::from_str_radix(&hex[4..6], 16)?;
-                Ok(Rgba([r, g, b, 255]))
+                Ok(rgb::Rgba {
+                    r: (r),
+                    g: (g),
+                    b: (b),
+                    a: 255,
+                })
             }
             8 => {
                 // RGBA format
@@ -119,54 +127,106 @@ pub fn parse_color(color: &str) -> Result<Rgba<u8>> {
                 let g = u8::from_str_radix(&hex[2..4], 16)?;
                 let b = u8::from_str_radix(&hex[4..6], 16)?;
                 let a = u8::from_str_radix(&hex[6..8], 16)?;
-                Ok(Rgba([r, g, b, a]))
+                Ok(rgb::Rgba {
+                    r: (r),
+                    g: (g),
+                    b: (b),
+                    a: (a),
+                })
             }
             3 => {
                 // Short RGB format
                 let r = u8::from_str_radix(&hex[0..1], 16)? * 17;
                 let g = u8::from_str_radix(&hex[1..2], 16)? * 17;
                 let b = u8::from_str_radix(&hex[2..3], 16)? * 17;
-                Ok(Rgba([r, g, b, 255]))
+                Ok(rgb::Rgba {
+                    r: (r),
+                    g: (g),
+                    b: (b),
+                    a: 255,
+                })
             }
             _ => Err(anyhow!("Invalid hex color format: {}", color)),
         }
     } else {
         // Handle named colors
         match color.to_lowercase().as_str() {
-            "black" => Ok(Rgba([0, 0, 0, 255])),
-            "white" => Ok(Rgba([255, 255, 255, 255])),
-            "red" => Ok(Rgba([255, 0, 0, 255])),
-            "green" => Ok(Rgba([0, 255, 0, 255])),
-            "blue" => Ok(Rgba([0, 0, 255, 255])),
-            "yellow" => Ok(Rgba([255, 255, 0, 255])),
-            "cyan" => Ok(Rgba([0, 255, 255, 255])),
-            "magenta" => Ok(Rgba([255, 0, 255, 255])),
-            "transparent" => Ok(Rgba([0, 0, 0, 0])),
-            _ => Err(anyhow!("Unknown color name: {}", color)),
+            "black" => Ok(Rgba {
+                r: 0,
+                g: 0,
+                b: 0,
+                a: 255,
+            }),
+            "white" => Ok(Rgba {
+                r: 255,
+                g: 255,
+                b: 255,
+                a: 255,
+            }),
+            "red" => Ok(Rgba {
+                r: 255,
+                g: 0,
+                b: 0,
+                a: 255,
+            }),
+            "green" => Ok(Rgba {
+                r: 0,
+                g: 255,
+                b: 0,
+                a: 255,
+            }),
+            "blue" => Ok(Rgba {
+                r: 0,
+                g: 0,
+                b: 255,
+                a: 255,
+            }),
+            "yellow" => Ok(Rgba {
+                r: 255,
+                g: 255,
+                b: 0,
+                a: 255,
+            }),
+            "cyan" => Ok(Rgba {
+                r: 0,
+                g: 255,
+                b: 255,
+                a: 255,
+            }),
+            "magenta" => Ok(Rgba {
+                r: 255,
+                g: 0,
+                b: 255,
+                a: 255,
+            }),
+            "transparent" => Ok(Rgba {
+                r: 0,
+                g: 0,
+                b: 0,
+                a: 0,
+            }),
+            other => Err(anyhow!("Unknown color name: {}", other)),
         }
     }
 }
 
 /// Parse a gradient specification into a list of colors
-fn parse_gradient(gradient: &str) -> Result<Vec<Rgba<u8>>> {
-    let parts: Vec<&str> = gradient.split('-').collect();
+fn parse_gradient(gradient: &str) -> Result<Vec<RGBA8>> {
+    let parts = gradient.split('-').collect::<Vec<_>>();
     let mut colors = Vec::with_capacity(parts.len());
-
     for part in parts {
         colors.push(parse_color(part)?);
     }
-
     Ok(colors)
 }
 
 /// Interpolate between two colors
-fn interpolate_color(color1: Rgba<u8>, color2: Rgba<u8>, t: f32) -> Rgba<u8> {
+fn interpolate_color(color1: RGBA8, color2: RGBA8, t: f32) -> RGBA8 {
     let lerp = |a: u8, b: u8, t: f32| -> u8 { (a as f32 * (1.0 - t) + b as f32 * t).round() as u8 };
-
-    Rgba([
-        lerp(color1[0], color2[0], t),
-        lerp(color1[1], color2[1], t),
-        lerp(color1[2], color2[2], t),
-        lerp(color1[3], color2[3], t),
-    ])
+    Rgba {
+        r: lerp(color1.r, color2.r, t),
+        g: lerp(color1.g, color2.g, t),
+        b: lerp(color1.b, color2.b, t),
+        a: lerp(color1.a, color2.a, t),
+    }
 }

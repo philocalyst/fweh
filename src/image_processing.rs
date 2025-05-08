@@ -91,7 +91,7 @@ pub fn process_image(
     debug!("Creating background of size {}x{}", new_width, new_height);
 
     // Create background
-    let mut background = create_background(width, height, &options.background)?;
+    let mut background = create_background(new_width, new_height, &options.background)?;
 
     // Calculate position to place the image on the background
     let x = (new_width as f32 - width as f32) / 2.0 + options.offset.x;

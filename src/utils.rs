@@ -1,8 +1,7 @@
 //! Utility functions and types
 
 use anyhow::Result;
-use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba};
-use std::path::Path;
+use image::Rgba;
 use tempfile::NamedTempFile;
 
 /// A 2D point with floating-point coordinates

@@ -258,10 +258,3 @@ pub fn to_image_rgba(px: RgbRgba<u8>) -> ImageRgba<u8> {
     // ImageRgba is a tuple‐struct around [u8;4]
     ImageRgba([px.r, px.g, px.b, px.a])
 }
-
-/// Turn an image::Rgba<u8> back into rgb::Rgba<u8>
-pub fn from_image_rgba(px: ImageRgba<u8>) -> RgbRgba<u8> {
-    // you can either destructure or call .0
-    let [r, g, b, a] = px.0;
-    RgbRgba { r, g, b, a }
-}

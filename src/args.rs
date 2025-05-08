@@ -59,11 +59,19 @@ pub struct Args {
     pub shadow_opacity: f32,
 }
 
+fn has_shadow_options(args: &Args) -> bool {
+    if args.shadow_offset.is_some() {
+        return true;
+    } else {
+        return false;
+    }
+}
+
 impl From<Args> for ProcessingOptions {
     fn from(args: Args) -> Self {
         let offset = parse_point(&args.offset).unwrap_or(Point::new(0.0, 0.0));
 
-        let shadow = if args.shadow_offset.is_some() {
+        let shadow = if has_shadow_options(&args) {
             let shadow_offset = parse_point(args.shadow_offset.as_ref().unwrap())
                 .unwrap_or(Point::new(25.0, -25.0));
 

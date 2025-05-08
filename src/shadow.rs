@@ -1,7 +1,7 @@
 //! Shadow effects
 
 use anyhow::{anyhow, Result};
-use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba, RgbaImage};
+use image::{imageops::blur, DynamicImage, GenericImageView, ImageBuffer, Rgba, RgbaImage};
 use log::debug;
 
 use crate::background::parse_color;
@@ -62,11 +62,11 @@ pub fn add_drop_shadow(image: &RgbaImage, options: &ShadowOptions) -> Result<Rgb
     }
 
     // Apply Gaussian blur to create the shadow effect
-    let blurred_mask = gaussian_blur(&alpha_mask, options.radius);
+    image::imageops::blur(&alpha_mask, options.radius);
 
     // Apply opacity to the blurred mask
     let mut shadow_image = RgbaImage::new(shadow_width, shadow_height);
-    for (x, y, pixel) in blurred_mask.enumerate_pixels() {
+    for (x, y, pixel) in alpha_mask.enumerate_pixels() {
         let alpha = (pixel[3] as f32 * options.opacity).min(255.0) as u8;
         shadow_image.put_pixel(
             x,
@@ -134,73 +134,4 @@ pub fn add_drop_shadow(image: &RgbaImage, options: &ShadowOptions) -> Result<Rgb
 /// Blend two color values based on alpha
 fn blend(bg: u8, fg: u8, alpha: f32) -> u8 {
     (bg as f32 * (1.0 - alpha) + fg as f32 * alpha) as u8
-}
-
-/// Apply a Gaussian blur to an image
-fn gaussian_blur(image: &RgbaImage, radius: f32) -> RgbaImage {
-    // For simplicity, we'll use a box blur approximation of Gaussian blur
-    // For a real implementation, a proper Gaussian kernel would be better
-    let iterations = (radius / 2.0).ceil() as usize;
-    let mut result = image.clone();
-
-    for _ in 0..iterations {
-        result = box_blur(&result);
-    }
-
-    result
-}
-
-/// Apply a simple box blur to an image
-fn box_blur(image: &RgbaImage) -> RgbaImage {
-    let (width, height) = image.dimensions();
-    let mut result = RgbaImage::new(width, height);
-
-    let kernel_size = 3; // 3x3 kernel
-    let kernel_radius = kernel_size / 2;
-
-    for y in 0..height {
-        for x in 0..width {
-            let mut r_sum = 0u32;
-            let mut g_sum = 0u32;
-            let mut b_sum = 0u32;
-            let mut a_sum = 0u32;
-            let mut count = 0u32;
-
-            for ky in 0..kernel_size {
-                let sample_y = y.saturating_add(ky).saturating_sub(kernel_radius);
-                if sample_y >= height {
-                    continue;
-                }
-
-                for kx in 0..kernel_size {
-                    let sample_x = x.saturating_add(kx).saturating_sub(kernel_radius);
-                    if sample_x >= width {
-                        continue;
-                    }
-
-                    let pixel = image.get_pixel(sample_x, sample_y);
-                    r_sum += pixel[0] as u32;
-                    g_sum += pixel[1] as u32;
-                    b_sum += pixel[2] as u32;
-                    a_sum += pixel[3] as u32;
-                    count += 1;
-                }
-            }
-
-            if count > 0 {
-                result.put_pixel(
-                    x,
-                    y,
-                    Rgba([
-                        (r_sum / count) as u8,
-                        (g_sum / count) as u8,
-                        (b_sum / count) as u8,
-                        (a_sum / count) as u8,
-                    ]),
-                );
-            }
-        }
-    }
-
-    result
 }

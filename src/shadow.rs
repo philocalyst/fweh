@@ -59,7 +59,7 @@ pub fn add_drop_shadow(image: &RgbaImage, options: &ShadowOptions) -> Result<Rgb
     log::trace!("Applying opacity to the blurred mask");
     let mut shadow_image = RgbaImage::new(shadow_width, shadow_height);
     for (x, y, pixel) in alpha_mask.enumerate_pixels() {
-        let alpha = (pixel[3] as f32 * options.opacity).min(255.0) as u8;
+        let alpha = (pixel[3] as f32 * options.opacity) as u8;
         shadow_image.put_pixel(
             x,
             y,

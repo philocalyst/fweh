@@ -3,6 +3,7 @@
 use anyhow::Result;
 use image::{imageops, ImageBuffer, Rgba, RgbaImage};
 use log;
+use rayon::prelude::*;
 use rgb;
 
 use crate::background::parse_color;
@@ -42,32 +43,13 @@ pub fn add_drop_shadow(image: &RgbaImage, options: &ShadowOptions) -> Result<Rgb
     let shadow_height = image.height() + 2 * options.radius as u32;
 
     // Create alpha mask from original image
-    let mut alpha_mask = ImageBuffer::new(shadow_width, shadow_height);
-
     // Position of the original image in the larger shadow canvas
     let offset_x = options.offset.x as u32;
     let offset_y = options.offset.y as u32;
 
     // Copy alpha channel to create the shadow mask
-    for (x, y, pixel) in image.enumerate_pixels() {
-        let alpha = pixel[3] as f32 / 255.0;
-        let shadow_x = x + offset_x;
-        let shadow_y = y + offset_y;
-
-        if shadow_x < shadow_width && shadow_y < shadow_height {
-            alpha_mask.put_pixel(
-                shadow_x,
-                shadow_y,
-                to_image_rgba(rgb::Rgba {
-                    r: 255,
-                    g: 255,
-                    b: 255,
-                    a: (alpha * 255.0) as u8,
-                }),
-            );
-        }
-    }
     log::trace!("Began copying alpha channel to create the shadow mask");
+    let alpha_mask = create_alpha_mask(&image, offset_x, offset_y, shadow_width, shadow_height);
 
     // Apply Gaussian blur to create the shadow effect
     log::trace!("Applying Guassian blur");
@@ -128,4 +110,45 @@ pub fn add_drop_shadow(image: &RgbaImage, options: &ShadowOptions) -> Result<Rgb
     );
 
     Ok(final_image)
+}
+
+/// Build a shadow‐alpha mask in parallel.
+///
+/// For each shadow‐pixel index `i`:
+///   let s_x = i % shadow_width;  s_y = i / shadow_width;
+///   if s_x>=offset_x && s_y>=offset_y,
+///     let x = s_x-offset_x;  y = s_y-offset_y;
+///     if (x,y) in source `image` bounds, read its alpha channel
+///       \(\alpha = p[3]/255.0\) and write RGBA = [255,255,255, (α*255.0) as u8].
+fn create_alpha_mask(
+    image: &ImageBuffer<Rgba<u8>, Vec<u8>>,
+    offset_x: u32,
+    offset_y: u32,
+    shadow_width: u32,
+    shadow_height: u32,
+) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+    // preallocate a flat RGBA buffer
+    let mut buf = vec![0u8; (shadow_width * shadow_height * 4) as usize];
+
+    buf.par_chunks_mut(4).enumerate().for_each(|(i, pixel)| {
+        let s_x = (i as u32) % shadow_width;
+        let s_y = (i as u32) / shadow_width;
+        if s_x >= offset_x && s_y >= offset_y {
+            let x = s_x - offset_x;
+            let y = s_y - offset_y;
+            if x < image.width() && y < image.height() {
+                let p = image.get_pixel(x, y);
+                // normalize alpha: α = p[3]/255.0
+                let alpha = p[3] as f32 / 255.0;
+                pixel[0] = 255;
+                pixel[1] = 255;
+                pixel[2] = 255;
+                pixel[3] = (alpha * 255.0) as u8;
+            }
+        }
+    });
+
+    // reconstruct an ImageBuffer from the raw Vec<u8>
+    ImageBuffer::from_raw(shadow_width, shadow_height, buf)
+        .expect("buffer size must match dimensions")
 }

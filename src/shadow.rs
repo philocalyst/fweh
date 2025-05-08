@@ -45,8 +45,8 @@ pub fn add_drop_shadow(image: &RgbaImage, options: &ShadowOptions) -> Result<Rgb
     let mut alpha_mask = ImageBuffer::new(shadow_width, shadow_height);
 
     // Position of the original image in the larger shadow canvas
-    let offset_x = options.radius as u32;
-    let offset_y = options.radius as u32;
+    let offset_x = options.offset.x as u32;
+    let offset_y = options.offset.y as u32;
 
     // Copy alpha channel to create the shadow mask
     for (x, y, pixel) in image.enumerate_pixels() {

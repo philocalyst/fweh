@@ -1,10 +1,10 @@
-# Welcome to Frame 🖼️
+# Welcome to Fweh(ame) 🖼️
 
-Frame is a command-line tool designed for enhancing your images by adding professional-looking frames, shadows, rounded corners, and customizable backgrounds. It allows you to easily process images, adjust their aspect ratios, and apply various visual effects to make them stand out.
+Fweh is a command-line tool designed for enhancing your images by adding professional-looking fwehs, shadows, rounded corners, and customizable backgrounds. It allows you to easily process images, adjust their aspect ratios, and apply various visual effects to make them stand out.
 
 ## Brief Summary
 
-Frame empowers you to:
+Fweh empowers you to:
 
 *   Add solid color, gradient, or image-based backgrounds.
 *   Apply soft drop shadows with configurable offset, color, blur, and opacity.
@@ -15,14 +15,14 @@ Frame empowers you to:
 
 ## Get Started
 
-To start using Frame, you'll first need to [install it](#install). Once installed, you can process images directly from your command line.
+To start using Fweh, you'll first need to [install it](#install). Once installed, you can process images directly from your command line.
 
 ## Tutorial
 
-Frame is controlled via command-line arguments. Here's the basic syntax:
+Fweh is controlled via command-line arguments. Here's the basic syntax:
 
 ```bash
-frame <input_image_path> [options]
+fweh <input_image_path> [options]
 ```
 
 ### Core Options:
@@ -31,7 +31,7 @@ frame <input_image_path> [options]
 *   `-o, --output <output_path>`: Specifies the output filename.
     *   Default: `output.png`
     *   Example: `-o ./processed/my_image.png`
-*   `-s, --scale <percentage>`: Scales the input image within the frame. `100.0` means the image touches the edges of its allocated space before padding for aspect ratio.
+*   `-s, --scale <percentage>`: Scales the input image within the fweh. `100.0` means the image touches the edges of its allocated space before padding for aspect ratio.
     *   Default: `110.0` (which means the background will be visible around the image, effectively scaling the image down to fit within `100/110 %` of the space)
     *   Example: `--scale 90.0`
 *   `-b, --background <type:value>`: Sets the background.
@@ -69,8 +69,8 @@ To enable a shadow, you must provide at least `--shadow-offset`.
 ### Example Usage:
 
 ```bash
-frame ./source_images/cat.jpg \
-    -o ./output/cat_framed.png \
+fweh ./source_images/cat.jpg \
+    -o ./output/cat_fwehd.png \
     --scale 95.0 \
     --background colr:#333333 \
     --ratio 16:9 \
@@ -92,7 +92,7 @@ This command will:
 
 ## Design Philosophy
 
-Frame aims to be a flexible and easy-to-use command-line tool for common image enhancement tasks. It prioritizes:
+Fweh aims to be a flexible and easy-to-use command-line tool for common image enhancement tasks. It prioritizes:
 
 *   **Simplicity:** Providing clear and understandable command-line options.
 *   **Customization:** Offering a good range of parameters to fine-tune the output.
@@ -106,7 +106,7 @@ You'll need Rust and Cargo installed. The project uses `just` (a command runner)
 1.  **Clone the repository:**
     ```bash
     git clone <repository_url>
-    cd frame
+    cd fweh
     ```
 
 2.  **Build:**
@@ -134,11 +134,11 @@ You'll need Rust and Cargo installed. The project uses `just` (a command runner)
         # For release version:
         cargo run --release -- <input_image> [options]
         ```
-    The compiled binary will be in `target/debug/frame` or `target/release/frame`.
+    The compiled binary will be in `target/debug/fweh` or `target/release/fweh`.
 
 ## Install
 
-You can install Frame in a few ways:
+You can install Fweh in a few ways:
 
 1.  **Using `just` (if you have `just` installed and are in the project root):**
     ```bash
@@ -150,10 +150,10 @@ You can install Frame in a few ways:
     ```bash
     cargo install --path .
     ```
-    This installs the `frame` binary into your Cargo binary path (usually `~/.cargo/bin/`).
+    This installs the `fweh` binary into your Cargo binary path (usually `~/.cargo/bin/`).
 
 3.  **Pre-compiled Binaries (Recommended for most users):**
-    Check the [Releases page](https://github.com/your_username/frame/releases) <!-- TODO: Update this link --> for pre-compiled binaries for your operating system. Download the archive, extract it, and place the `frame` executable in a directory included in your system's PATH. The packaged releases also include shell completion scripts.
+    Check the [Releases page](https://github.com/your_username/fweh/releases) <!-- TODO: Update this link --> for pre-compiled binaries for your operating system. Download the archive, extract it, and place the `fweh` executable in a directory included in your system's PATH. The packaged releases also include shell completion scripts.
 
 ## Changelog
 
@@ -161,7 +161,7 @@ All notable changes to this project are documented in the [CHANGELOG.md](CHANGEL
 
 ## Libraries Used
 
-Frame is built with Rust and leverages several excellent open-source libraries:
+Fweh is built with Rust and leverages several excellent open-source libraries:
 
 *   [clap](https://crates.io/crates/clap): For command-line argument parsing.
 *   [image](https://crates.io/crates/image): For core image loading, manipulation, and saving.
@@ -176,7 +176,7 @@ Frame is built with Rust and leverages several excellent open-source libraries:
 ## Acknowledgements
 
 *   Thanks to the Rust community and the maintainers of all the libraries used in this project.
-*   Inspired by various image processing tools and the need for a simple, scriptable framer.
+*   Inspired by various image processing tools and the need for a simple, scriptable framing tool.
 
 ## License
 

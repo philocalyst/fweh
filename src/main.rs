@@ -1,4 +1,4 @@
-//! Frame - A tool for framing images with shadows, rounded corners, and backgrounds
+//! Fweh - A tool for framing images with shadows, rounded corners, and backgrounds
 //!
 //! This application allows you to process images by adding backgrounds, shadows, and
 //! rounded corners, as well as resizing to specific aspect ratios.

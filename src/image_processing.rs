@@ -7,7 +7,7 @@ use rgb;
 use std::path::{Path, PathBuf};
 
 use crate::background::{create_background, BackgroundType};
-use crate::error::FramerError;
+use crate::error::FwehError;
 use crate::shadow::{add_drop_shadow, ShadowOptions};
 use crate::utils::{calculate_aspect_ratio, calculate_padding, CornerRadii, Point};
 
@@ -54,7 +54,7 @@ pub fn process_image(
     options: ProcessingOptions,
 ) -> Result<PathBuf> {
     // Load the input image
-    let input_image = image::open(input_path).map_err(|e| FramerError::ImageLoadError(e))?;
+    let input_image = image::open(input_path).map_err(|e| FwehError::ImageLoadError(e))?;
 
     let input_rgba = input_image.to_rgba8();
     let (width, height) = input_rgba.dimensions();
@@ -109,7 +109,7 @@ pub fn process_image(
     // Save the final image
     background
         .save(output_path)
-        .map_err(|e| FramerError::ImageSaveError(e.to_string()))?;
+        .map_err(|e| FwehError::ImageSaveError(e.to_string()))?;
 
     Ok(output_path.to_path_buf())
 }

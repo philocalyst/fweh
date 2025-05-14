@@ -6,7 +6,7 @@ use thiserror::Error;
 
 /// Error types for the image framer
 #[derive(Error, Debug)]
-pub enum FramerError {
+pub enum FwehError {
     #[error("Failed to load image: {0}")]
     ImageLoadError(#[from] image::ImageError),
 
